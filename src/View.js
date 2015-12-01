@@ -1,5 +1,5 @@
 const {createView} = require("gl-react-core");
-const React = require("react-native");
+const React = require("./React");
 const Shaders = require("./Shaders");
 const Uniform = require("./Uniform");
 const GLCanvas = require("./GLCanvas");
