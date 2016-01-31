@@ -1,7 +1,9 @@
 #import "GLCanvasManager.h"
 #import "GLCanvas.h"
 #import "RCTConvert+GLData.h"
+#import "RCTConvert+CaptureConfig.h"
 #import "RCTLog.h"
+#import "RCTUIManager.h"
 #import <AppKit/AppKit.h>
 
 @implementation GLCanvasManager
@@ -16,42 +18,43 @@ RCT_EXPORT_MODULE();
   return self;
 }
 
+- (dispatch_queue_t)methodQueue
+{
+  return self.bridge.uiManager.methodQueue;
+}
+
 RCT_EXPORT_VIEW_PROPERTY(nbContentTextures, NSNumber);
 RCT_EXPORT_VIEW_PROPERTY(opaque, BOOL);
 RCT_EXPORT_VIEW_PROPERTY(autoRedraw, BOOL);
-RCT_EXPORT_VIEW_PROPERTY(eventsThrough, BOOL);
-RCT_EXPORT_VIEW_PROPERTY(visibleContent, BOOL);
-RCT_EXPORT_VIEW_PROPERTY(captureNextFrameId, int);
 RCT_EXPORT_VIEW_PROPERTY(data, GLData);
 RCT_EXPORT_VIEW_PROPERTY(renderId, NSNumber);
+RCT_EXPORT_VIEW_PROPERTY(pixelRatio, NSNumber);
 RCT_EXPORT_VIEW_PROPERTY(imagesToPreload, NSArray);
-RCT_EXPORT_VIEW_PROPERTY(onLoad, BOOL);
-RCT_EXPORT_VIEW_PROPERTY(onProgress, BOOL);
-RCT_EXPORT_VIEW_PROPERTY(onChange, BOOL);
+RCT_EXPORT_VIEW_PROPERTY(onGLLoad, RCTBubblingEventBlock);
+RCT_EXPORT_VIEW_PROPERTY(onGLProgress, RCTBubblingEventBlock);
+RCT_EXPORT_VIEW_PROPERTY(onGLCaptureFrame, RCTBubblingEventBlock);
 
-/* TODO
-
- RCT_EXPORT_METHOD(capture:
- (nonnull NSNumber *)reactTag
- callback:(RCTResponseSenderBlock)callback)
- {
- 
- UIView *view = [self.bridge.uiManager viewForReactTag:reactTag];
- if ([view isKindOfClass:[GLCanvas class]]) {
- [((GLCanvas*)view) capture: callback];
- }
- else {
- callback(@[@"view is not a GLCanvas"]);
- }
- }
- */
+RCT_EXPORT_METHOD(capture: (nonnull NSNumber *)reactTag withConfig:(id)config)
+{
+  [self.bridge.uiManager addUIBlock:^(RCTUIManager *uiManager, NSDictionary<NSNumber *, NSView *> *viewRegistry) {
+    NSView *view = viewRegistry[reactTag];
+    if (![view isKindOfClass:[GLCanvas class]]) {
+      RCTLog(@"expecting NSView, got: %@", view);
+    }
+    else {
+      GLCanvas *glCanvas = (GLCanvas *)view;
+      [glCanvas requestCaptureFrame:[RCTConvert CaptureConfig:config]];
+    }
+  }];
+}
 
 - (NSView *)view
 {
   GLCanvas * v;
   v = [[GLCanvas alloc] initWithBridge:self.bridge];
   return v;
-  
+
 }
+
 
 @end

@@ -6,13 +6,13 @@
 -(instancetype) initWithShader: (GLShader *)shader
                   withUniforms:(NSDictionary *)uniforms
                   withTextures: (NSDictionary *)textures
-                     withWidth: (NSNumber *)width
-                    withHeight: (NSNumber *)height
+                     withWidth: (int) width
+                    withHeight: (int) height
                      withFboId: (int)fboId
            withContextChildren: (NSArray *)contextChildren
                   withChildren: (NSArray *)children
 {
-  
+
   if ((self = [super init])) {
     self.shader = shader;
     self.uniforms = uniforms;

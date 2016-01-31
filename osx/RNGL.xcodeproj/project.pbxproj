@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		037F958B1C5E560E009D0DC3 /* CaptureConfig.m in Sources */ = {isa = PBXBuildFile; fileRef = 037F958A1C5E560E009D0DC3 /* CaptureConfig.m */; };
+		037F958E1C5E5633009D0DC3 /* RCTConvert+CaptureConfig.m in Sources */ = {isa = PBXBuildFile; fileRef = 037F958D1C5E5633009D0DC3 /* RCTConvert+CaptureConfig.m */; };
 		346089D01BEFD0A500C90DB5 /* GLCanvas.m in Sources */ = {isa = PBXBuildFile; fileRef = 346089BB1BEFD0A500C90DB5 /* GLCanvas.m */; };
 		346089D11BEFD0A500C90DB5 /* GLCanvasManager.m in Sources */ = {isa = PBXBuildFile; fileRef = 346089BD1BEFD0A500C90DB5 /* GLCanvasManager.m */; };
 		346089D21BEFD0A500C90DB5 /* GLData.m in Sources */ = {isa = PBXBuildFile; fileRef = 346089BF1BEFD0A500C90DB5 /* GLData.m */; };
@@ -33,6 +35,10 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		037F95891C5E560D009D0DC3 /* CaptureConfig.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CaptureConfig.h; sourceTree = "<group>"; };
+		037F958A1C5E560E009D0DC3 /* CaptureConfig.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = CaptureConfig.m; sourceTree = "<group>"; };
+		037F958C1C5E5633009D0DC3 /* RCTConvert+CaptureConfig.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = "RCTConvert+CaptureConfig.h"; sourceTree = "<group>"; };
+		037F958D1C5E5633009D0DC3 /* RCTConvert+CaptureConfig.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = "RCTConvert+CaptureConfig.m"; sourceTree = "<group>"; };
 		346089BA1BEFD0A500C90DB5 /* GLCanvas.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GLCanvas.h; sourceTree = "<group>"; };
 		346089BB1BEFD0A500C90DB5 /* GLCanvas.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; path = GLCanvas.m; sourceTree = "<group>"; };
 		346089BC1BEFD0A500C90DB5 /* GLCanvasManager.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = GLCanvasManager.h; sourceTree = "<group>"; };
@@ -72,6 +78,10 @@
 		410701241ACB719800C6AA39 = {
 			isa = PBXGroup;
 			children = (
+				037F958C1C5E5633009D0DC3 /* RCTConvert+CaptureConfig.h */,
+				037F958D1C5E5633009D0DC3 /* RCTConvert+CaptureConfig.m */,
+				037F95891C5E560D009D0DC3 /* CaptureConfig.h */,
+				037F958A1C5E560E009D0DC3 /* CaptureConfig.m */,
 				346089BA1BEFD0A500C90DB5 /* GLCanvas.h */,
 				346089BB1BEFD0A500C90DB5 /* GLCanvas.m */,
 				346089BC1BEFD0A500C90DB5 /* GLCanvasManager.h */,
@@ -165,12 +175,14 @@
 				346089DA1BEFD0A500C90DB5 /* RNGLContext.m in Sources */,
 				346089D21BEFD0A500C90DB5 /* GLData.m in Sources */,
 				346089D91BEFD0A500C90DB5 /* RCTConvert+GLData.m in Sources */,
+				037F958B1C5E560E009D0DC3 /* CaptureConfig.m in Sources */,
 				346089D51BEFD0A500C90DB5 /* GLImageData.m in Sources */,
 				346089D41BEFD0A500C90DB5 /* GLImage.m in Sources */,
 				346089D61BEFD0A500C90DB5 /* GLRenderData.m in Sources */,
 				346089D11BEFD0A500C90DB5 /* GLCanvasManager.m in Sources */,
 				346089D01BEFD0A500C90DB5 /* GLCanvas.m in Sources */,
 				346089D71BEFD0A500C90DB5 /* GLShader.m in Sources */,
+				037F958E1C5E5633009D0DC3 /* RCTConvert+CaptureConfig.m in Sources */,
 				346089D81BEFD0A500C90DB5 /* GLTexture.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -8,6 +8,13 @@
 @property NSString *frag;
 @property NSDictionary *uniformTypes;
 
+NS_ENUM(NSInteger) {
+     GLContextFailure = 87001,
+     GLLinkingFailure = 87002,
+     GLCompileFailure = 87003,
+     GLNotAProgram    = 87004
+ };
+
 /**
  * Create a new shader with a vertex and fragment
  */
@@ -23,6 +30,7 @@
  */
 - (void) validate;
 
+- (bool) ensureCompiles: (NSError**)error;
 /**
  * Set the value of an uniform
  */

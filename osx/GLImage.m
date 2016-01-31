@@ -50,12 +50,12 @@ RCT_NOT_IMPLEMENTED(-init)
 {
   if (_image) {
     if (!_data) {
-      _data = genPixelsWithImage(_image);
+        _data = [GLImageData genPixelsWithImage:_image];
     }
     [_texture setPixels:_data];
   }
   else {
-    [_texture setPixelsEmpty];
+      [_texture setPixels:nil];
   }
   return _texture;
 }
@@ -75,9 +75,9 @@ RCT_NOT_IMPLEMENTED(-init)
   if (!_src) {
     [self clearImage];
   } else {
-    
+
     // Load the image (without resizing it)
-    
+
     if (![_src hasPrefix:@"http://"] && ![_src hasPrefix:@"https://"]) {
       self.image = [NSImage imageNamed:_src];
       dispatch_async(dispatch_get_main_queue(), ^{

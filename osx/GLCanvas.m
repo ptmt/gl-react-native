@@ -25,6 +25,15 @@ NSString* srcResource (id res)
   }
   return src;
 }
+NSArray* diff (NSArray* a, NSArray* b) {
+    NSMutableArray *arr = [[NSMutableArray alloc] init];
+    for (NSString* k in a) {
+        if (![b containsObject:k]) {
+            [arr addObject:k];
+        }
+    }
+    return arr;
+}
 
 // For reference, see implementation of gl-shader's GLCanvas
 
@@ -33,6 +42,7 @@ NSString* srcResource (id res)
   RCTBridge *_bridge;
   
   GLRenderData *_renderData;
+  NSArray *_contentData;
   
   NSArray *_contentTextures;
   NSDictionary *_images; // This caches the currently used images (imageSrc -> GLReactImage)
@@ -43,14 +53,16 @@ NSString* srcResource (id res)
   
   GLint defaultFBO;
   
-  NSMutableArray *_preloaded;
-  BOOL _preloadingDone;
-  
+    NSMutableArray *_preloaded;
+    BOOL _dirtyOnLoad;
+    BOOL _neverRendered;
+    
   NSTimer *animationTimer;
   
-  int _lastCaptureId;
-    
-  BOOL _needSync;
+    BOOL _needSync;
+
+    NSMutableArray *_captureConfigs;
+    BOOL _captureScheduled;
 
 }
 
@@ -60,8 +72,7 @@ NSString* srcResource (id res)
     _bridge = bridge;
     _images = @{};
     _preloaded = [[NSMutableArray alloc] init];
-    _preloadingDone = false;
-    _lastCaptureId = 0;
+      _captureConfigs = [[NSMutableArray alloc] init];
     [self setOpenGLContext:[bridge.rnglContext getContext]];
     [self setPixelFormat:[self openGLContext].pixelFormat];
     //[self setWantsBestResolutionOpenGLSurface:YES];
@@ -72,19 +83,30 @@ NSString* srcResource (id res)
 
 RCT_NOT_IMPLEMENTED(-init)
 
+-(void)dealloc
+{
+    _bridge = nil;
+    _images = nil;
+    _preloaded = nil;
+    _captureConfigs = nil;
+    _contentData = nil;
+    _contentTextures = nil;
+    _data = nil;
+    _renderData = nil;
+    if (animationTimer) {
+        [animationTimer invalidate];
+        animationTimer = nil;
+    }
+}
+
+
 //// Props Setters
 
 -(void)setImagesToPreload:(NSArray *)imagesToPreload
 {
-  if (_preloadingDone) return;
-  if ([imagesToPreload count] == 0) {
-    [self dispatchOnLoad];
-    _preloadingDone = true;
-  }
-  else {
-    _preloadingDone = false;
-  }
+
   _imagesToPreload = imagesToPreload;
+    [self requestSyncData];
 }
 
 - (BOOL)isOpaque
@@ -152,11 +174,7 @@ RCT_NOT_IMPLEMENTED(-init)
   _nbContentTextures = nbContentTextures;
 }
 
-- (void)setCaptureNextFrameId:(int)captureNextFrameId
-{
-  _captureNextFrameId = captureNextFrameId;
-  [self setNeedsDisplay:YES];
-}
+
 
 //// Sync methods (called from props setters)
 
@@ -212,7 +230,7 @@ RCT_NOT_IMPLEMENTED(-init)
           uniforms[uniformName] = [NSNumber numberWithInt:units++];
           if ([value isEqual:[NSNull null]]) {
             GLTexture *emptyTexture = [[GLTexture alloc] init];
-            [emptyTexture setPixelsEmpty];
+            [emptyTexture setPixels:nil];
             textures[uniformName] = emptyTexture;
           }
           else {
@@ -277,8 +295,8 @@ RCT_NOT_IMPLEMENTED(-init)
               initWithShader:shader
               withUniforms:uniforms
               withTextures:textures
-              withWidth:width
-              withHeight:height
+              withWidth:(int)width
+              withHeight:(int)height
               withFboId:fboId
               withContextChildren:contextChildren
               withChildren:children];
@@ -291,65 +309,199 @@ RCT_NOT_IMPLEMENTED(-init)
 
 - (void)syncContentTextures
 {
-  int i = 0;
-  for (GLTexture *texture in _contentTextures) {
-    NSView* view = self.superview.subviews[i]; // We take siblings by index (closely related to the JS code)
-    if (view) {
-      if ([view.subviews count] == 1)
-        [texture setPixelsWithView:view.subviews[0]];
-      else
-        [texture setPixelsWithView:view];
-    } else {
-      [texture setPixelsEmpty];
+    unsigned long max = MIN([_contentData count], [_contentTextures count]);
+    for (int i=0; i<max; i++) {
+        [_contentTextures[i] setPixels:_contentData[i]];
     }
-    i ++;
-  }
 }
 
+- (bool)syncData:(NSError **)error
+{
+    @autoreleasepool {
+
+        NSDictionary *prevImages = _images;
+        NSMutableDictionary *images = [[NSMutableDictionary alloc] init];
+
+        GLRenderData * (^traverseTree) (GLData *data);
+        __block __weak GLRenderData * (^weak_traverseTree)(GLData *data);
+        weak_traverseTree = traverseTree = ^GLRenderData *(GLData *data) {
+            NSNumber *width = data.width;
+            NSNumber *height = data.height;
+            NSNumber *pixelRatio = data.pixelRatio;
+            int fboId = [data.fboId intValue];
+
+            NSMutableArray *contextChildren = [[NSMutableArray alloc] init];
+            for (GLData *child in data.contextChildren) {
+                GLRenderData *node = weak_traverseTree(child);
+                if (node == nil) return nil;
+                [contextChildren addObject:node];
+            }
+
+            NSMutableArray *children = [[NSMutableArray alloc] init];
+            for (GLData *child in data.children) {
+                GLRenderData *node = weak_traverseTree(child);
+                if (node == nil) return nil;
+                [children addObject:node];
+            }
+
+            GLShader *shader = [_bridge.rnglContext getShader:data.shader];
+            if (shader == nil) return nil;
+            if (![shader ensureCompiles:error]) return nil;
+
+            NSDictionary *uniformTypes = [shader uniformTypes];
+            NSMutableDictionary *uniforms = [[NSMutableDictionary alloc] init];
+            NSMutableDictionary *textures = [[NSMutableDictionary alloc] init];
+            int units = 0;
+            for (NSString *uniformName in data.uniforms) {
+                id value = [data.uniforms objectForKey:uniformName];
+                GLenum type = [uniformTypes[uniformName] intValue];
+
+
+                if (type == GL_SAMPLER_2D || type == GL_SAMPLER_CUBE) {
+                    uniforms[uniformName] = [NSNumber numberWithInt:units++];
+                    if ([value isEqual:[NSNull null]]) {
+                        GLTexture *emptyTexture = [[GLTexture alloc] init];
+                        [emptyTexture setPixels:nil];
+                        textures[uniformName] = emptyTexture;
+                    }
+                    else {
+                        NSString *type = [RCTConvert NSString:value[@"type"]];
+                        if ([type isEqualToString:@"content"]) {
+                            int id = [[RCTConvert NSNumber:value[@"id"]] intValue];
+                            if (id >= [_contentTextures count]) {
+                                [self resizeUniformContentTextures:id+1];
+                            }
+                            textures[uniformName] = _contentTextures[id];
+                        }
+                        else if ([type isEqualToString:@"fbo"]) {
+                            NSNumber *id = [RCTConvert NSNumber:value[@"id"]];
+                            GLFBO *fbo = [_bridge.rnglContext getFBO:id];
+                            textures[uniformName] = fbo.color[0];
+                        }
+                        else if ([type isEqualToString:@"uri"]) {
+                            NSString *src = srcResource(value);
+                            if (!src) {
+                                RCTLogError(@"texture uniform '%@': Invalid uri format '%@'", uniformName, value);
+                            }
+
+                            GLImage *image = images[src];
+                            if (image == nil) {
+                                image = prevImages[src];
+                                if (image != nil)
+                                    images[src] = image;
+                            }
+                            if (image == nil) {
+                                __weak GLCanvas *weakSelf = self;
+                                image = [[GLImage alloc] initWithBridge:_bridge withOnLoad:^{
+                                    if (weakSelf) [weakSelf onImageLoad:src];
+                                }];
+                                image.src = src;
+                                images[src] = image;
+                            }
+                            textures[uniformName] = [image getTexture];
+                        }
+                        else {
+                            RCTLogError(@"texture uniform '%@': Unexpected type '%@'", uniformName, type);
+                        }
+                    }
+                }
+                else {
+                    uniforms[uniformName] = value;
+                }
+            }
+
+            int maxTextureUnits;
+            glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxTextureUnits);
+            if (units > maxTextureUnits) {
+                RCTLogError(@"Maximum number of texture reach. got %i >= max %i", units, maxTextureUnits);
+            }
+            
+            for (NSString *uniformName in shader.uniformTypes) {
+                if (uniforms[uniformName] == nil) {
+                    RCTLogError(@"All defined uniforms must be provided. Missing '%@'", uniformName);
+                }
+            }
+            
+            return [[GLRenderData alloc]
+                    initWithShader:shader
+                    withUniforms:uniforms
+                    withTextures:textures
+                    withWidth:(int)([width floatValue] * [pixelRatio floatValue])
+                    withHeight:(int)([height floatValue] * [pixelRatio floatValue])
+                    withFboId:fboId
+                    withContextChildren:contextChildren
+                    withChildren:children];
+        };
+        
+        GLRenderData *res = traverseTree(_data);
+        if (res != nil) {
+            _renderData = traverseTree(_data);
+            _images = images;
+            for (NSString *src in diff([prevImages allKeys], [images allKeys])) {
+                [_preloaded removeObject:src];
+            }
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+}
+
+
+
+- (BOOL)haveRemainingToPreload
+{
+    for (id res in _imagesToPreload) {
+        if (![_preloaded containsObject:srcResource(res)]) {
+            return true;
+        }
+    }
+    return false;
+}
 
 //// Draw
 
 - (void)drawRect:(CGRect)rect
 {
+    self.layer.opaque = _opaque;
+
+    if (_neverRendered) {
+        _neverRendered = false;
+        glClearColor(0.0, 0.0, 0.0, 0.0);
+        glClear(GL_COLOR_BUFFER_BIT);
+    }
+
     if (_needSync) {
-        _needSync = false;
-        [self syncData];
+        NSError *error;
+        BOOL syncSuccessful = [self syncData:&error];
+        BOOL errorCanBeRecovered = error==nil || (error.code != GLLinkingFailure && error.code != GLCompileFailure);
+        if (!syncSuccessful && errorCanBeRecovered) {
+            // something failed but is recoverable, retry in one tick
+            [self performSelectorOnMainThread:@selector(setNeedsDisplay) withObject:nil waitUntilDone:NO];
+        }
+        else {
+            _needSync = false;
+        }
     }
-  self.layer.opaque = _opaque;
-  [self syncEventsThrough];
-  __weak GLCanvas *weakSelf = self;
-  
-  if (!_preloadingDone) {
-    glClearColor(0.0, 0.0, 0.0, 0.0);
-    glClear(GL_COLOR_BUFFER_BIT);
-    return;
-  }
-    BOOL needsDeferredRendering = NO;//_nbContentTextures > 0 && !_autoRedraw;
-  if (needsDeferredRendering && !_deferredRendering) {
-    dispatch_async(dispatch_get_main_queue(), ^{
-      if (!weakSelf) return;
-      _deferredRendering = true;
-      [weakSelf setNeedsDisplay:YES];
-    });
-  }
-  else {
-    [self render];
-    _deferredRendering = false;
-    if (_captureNextFrameId > _lastCaptureId) {
-      _lastCaptureId ++;
-      int id = _lastCaptureId;
-      dispatch_async(dispatch_get_main_queue(), ^{ // snapshot not allowed in render tick. defer it.
-        if (!weakSelf) return;
-          NSLog(@"snapshot is not implemented");
-//        NSImage *frameImage = [weakSelf snapshot];
-//        NSData *frameData = NSImagePNGRepresentation(frameImage);
-//        NSString *frame =
-//        [NSString stringWithFormat:@"data:image/png;base64,%@",
-//         [frameData base64EncodedStringWithOptions:NSDataBase64Encoding64CharacterLineLength]];
-//        [weakSelf dispatchOnCapture:frame withId:id];
-      });
+
+    if ([self haveRemainingToPreload]) {
+        return;
     }
-  }
+
+    BOOL needsDeferredRendering = [_nbContentTextures intValue] > 0 && !_autoRedraw;
+    if (needsDeferredRendering && !_deferredRendering) {
+        _deferredRendering = true;
+        [self performSelectorOnMainThread:@selector(syncContentData) withObject:nil waitUntilDone:NO];
+    }
+    else {
+        _deferredRendering = false;
+        [self render];
+        if (!_captureScheduled && [_captureConfigs count] > 0) {
+            _captureScheduled = true;
+            [self performSelectorOnMainThread:@selector(capture) withObject:nil waitUntilDone:NO];
+        }
+    }
 }
 
 
@@ -363,8 +515,8 @@ RCT_NOT_IMPLEMENTED(-init)
     void (^recDraw) (GLRenderData *renderData);
     __block __weak void (^weak_recDraw) (GLRenderData *renderData);
     weak_recDraw = recDraw = ^void(GLRenderData *renderData) {
-      float w = [renderData.width floatValue] * scale;
-      float h = [renderData.height floatValue] * scale;
+        int w = renderData.width;
+        int h = renderData.height;
       for (GLRenderData *child in renderData.contextChildren)
         weak_recDraw(child);
       
@@ -417,22 +569,13 @@ RCT_NOT_IMPLEMENTED(-init)
 
 - (void)onImageLoad:(NSString *)loaded
 {
-  if (!_preloadingDone) {
     [_preloaded addObject:loaded];
     int count = [self countPreloaded];
     int total = (int) [_imagesToPreload count];
     double progress = ((double) count) / ((double) total);
     [self dispatchOnProgress:progress withLoaded:count withTotal:total];
-    if (count == total) {
-      [self dispatchOnLoad];
-      _preloadingDone = true;
-      [self requestSyncData];
-    }
-  }
-  else {
-    // Any texture image load will trigger a future re-sync of data (if no preloaded)
+    _dirtyOnLoad = true;
     [self requestSyncData];
-  }
 }
 
 - (int)countPreloaded
