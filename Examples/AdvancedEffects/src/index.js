@@ -61,6 +61,7 @@ class AdvancedEffects extends React.Component {
           width={viewportW}
           height={introH}
         />
+
         <Vignette
           time={time}
           width={imgW}

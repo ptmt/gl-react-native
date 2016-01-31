@@ -1,67 +1,51 @@
 **[Gitbook documentation](http://projectseptemberinc.gitbooks.io/gl-react/content/) / [Github](https://github.com/ProjectSeptemberInc/gl-react-native/) / [gl-react](https://github.com/ProjectSeptemberInc/gl-react/)** / [#gl-react on reactiflux](https://discordapp.com/channels/102860784329052160/106102146109325312)
 
-# <img width="32" alt="icon" src="https://cloud.githubusercontent.com/assets/211411/9813786/eacfcc24-5888-11e5-8f9b-5a907a2cbb21.png"> gl-react-native
+# <img width="32" alt="icon" src="https://cloud.githubusercontent.com/assets/211411/9813786/eacfcc24-5888-11e5-8f9b-5a907a2cbb21.png"> gl-react-native ![](https://img.shields.io/badge/react--native-%200.19.x-05F561.svg) ![](https://img.shields.io/badge/gl--react-%202.1.x-05F561.svg)
 
-OpenGL bindings for react-native to implement complex effects over images and components, in the descriptive VDOM paradigm.
+OpenGL bindings for React Native to implement complex effects over images and components, in the descriptive VDOM paradigm.
 
-More technically, `gl-react-native` allows you to write a [fragment shader](https://www.opengl.org/wiki/Fragment_Shader) that covers a View. The shader can render: generated graphics/demos, effects on top of images, effects over any UI content... anything you can imagine!
-
-**`gl-react-native` is directly inspired from our other project, [`gl-react`](http://github.com/ProjectSeptemberInc/gl-react) and implements the same API (so you can write "universal" code).**
+**`gl-react-native` is an implementation of `gl-react` for `react-native`. Please [read the main gl-react README](https://github.com/ProjectSeptemberInc/gl-react/) for more information.**
 
 [![](https://github.com/ProjectSeptemberInc/gl-react-native/raw/master/docs/simple.gif)](./Examples/Simple)[![](https://github.com/ProjectSeptemberInc/gl-react-native/raw/master/docs/advancedeffects.gif)](./Examples/AdvancedEffects)
 
-### HelloGL Gist
+## Documentation
 
-```js
-const React = require("react-native");
-const GL = require("gl-react-native");
-
-const shaders = GL.Shaders.create({
-  helloGL: {
-    frag: `
-precision highp float;
-varying vec2 uv;
-void main () {
-  gl_FragColor = vec4(uv.x, uv.y, 0.5, 1.0);
-}`
-  }
-});
-
-class HelloGL extends GL.Component {
-  render () {
-    const { width, height } = this.props;
-    return <GL.View
-      shader={shaders.helloGL}
-      width={width}
-      height={height}
-    />;
-  }
-}
-```
-
-![](https://github.com/ProjectSeptemberInc/gl-react-native/raw/master/docs/hellogl.jpg)
+[**Gitbook**](http://projectseptemberinc.gitbooks.io/gl-react/content/)
 
 ## Installation
-
-a few steps are required to install `gl-react-native`:
-
-**Install the dependency to your React Native application:**
 
 ```
 npm i --save gl-react-native
 ```
 
-**Configure your React Native Application:**
+### Configure your React Native Application
+
+**on iOS:**
 
 ![](https://github.com/ProjectSeptemberInc/gl-react-native/raw/master/docs/install-steps.png)
 
+**on Android:**
 
-## Influence / Credits
+1. `android/settings.gradle`:: Add the following snippet
+```gradle
+include ':RNGL'
+project(':RNGL').projectDir = file('../node_modules/gl-react-native/android')
+```
+1. `android/app/build.gradle`: Add in dependencies block.
+```gradle
+compile project(':RNGL')
+```
+1. in your `MainActivity` (or equivalent):
+```java
+import com.projectseptember.RNGL.RNGLPackage;
+...
 
-- [stack.gl](http://stack.gl/) approach
-- [GLSL.io](http://glsl.io/) and [Diaporama](https://github.com/gre/diaporama)
-- Source code of [React Native](https://github.com/facebook/react-native)
+mReactInstanceManager = ReactInstanceManager.builder()
+    .setApplication(getApplication())
+    ...
+    .addPackage(new MainReactPackage())
+    .addPackage(new RNGLPackage())
+    ...
+    .build();
 
-## Documentation
-
-[**Gitbook**](http://projectseptemberinc.gitbooks.io/gl-react/content/)
+```
