@@ -1,5 +1,5 @@
 const invariant = require("invariant");
-const React = require("react-native");
+const React = require("react-native-desktop");
 const {
   NativeModules: { GLCanvasManager }
 } = React;
